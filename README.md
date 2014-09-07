@@ -116,9 +116,11 @@ Cache
 First EzDB can cache mysql result for you. You just need to register which tables can be cached and for how long.
 
 ```php
-
+// enable cache for table brand 
 $db->AddCachedTable('brand', 3600 /* 3600 secondes cache, default is 300 */);
 
+// disable cache for table car 
+$db->DeleteCachedTable('car')
 ```
 
 As EzDB only connect to mysql server when needed, if you cache the right table you can easily create pages that can render without connecting to mysql. This is especially interesting for a front page.
@@ -155,6 +157,36 @@ $db->query_log_path = '/var/log/ezdb';
 ```
 
 All SQL query will be print on screen and stored on disk.
+
+Class Loader
+-------
+
+You can tell ezdb where you stored your custom EzDB class:
+```php
+$db->autoload_class_path = '/var/www/project/class';
+```
+Class loader work this way:
+ - PHP filename must be name of table.
+ - If in table name, there is a underscore ( _ ), it will optionally cut this to check sub directories.
+ - If file found it is require once and if a class with according name: EzDB + table name, it will be used as EzDB custom class.
+EzDB will look into this directory for 
+
+Other options
+-------
+ - When listing a table, you can ask EzDB to use primary key value a key index:
+```php
+$db->fill_list_with_primary_key = true;
+```
+ - EzDB can automaticelly set SQL_CALC_FOUND_ROWS in each SQL query so that you can findout how much entry are found in your query:
+```php
+$db->auto_get_found_rows = true;
+$total = $db->GetAffectedRows();
+
+```
+- EzDB can automaticelly set SQL_CALC_FOUND_ROWS in each SQL query so that you can findout how much entry are found in your query:
+```php
+$db->auto_get_found_rows = true;
+```
 
 
 
