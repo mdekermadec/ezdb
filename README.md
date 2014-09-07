@@ -1,11 +1,11 @@
-ezdb
+EzDB
 ====
 
 EzDB is a easy to use mysql helper for PHP.
 
 In most project :
--	90% of MySQL query are simple and boring query like SELECT * FROM table WHERE primary_key = 42.
--	The rest are more advance query with JOIN, ORDER, GROUP BY and other stuff like this
+ - 90% of MySQL query are simple and boring query like SELECT * FROM table WHERE primary_key = 42.
+ - The rest are more advance query with JOIN, ORDER, GROUP BY and other stuff like this
 
 EzDB allow you to do the first 90% of query with a simple and easy to use PHP API and let you use regular SQL for the rest.
 
@@ -14,14 +14,14 @@ It is build with performance in mind and can bu used with heavy load services.
 Why ?
 -------
 
--	SQL is not a bad language and should not avoid at all cost.
--	Developpers are lazy and write too simple query is anoying.
+ - SQL is not a bad language and should not avoid at all cost.
+ - Developpers are lazy and write too simple query is anoying.
 
 Requirement :
 -------
 
--	EzDB need APC
--	You must configure primary key in your mysql table
+ - EzDB need APC
+ - You must configure primary key in your mysql table
 
 Basic Usage :
 -------
@@ -62,7 +62,11 @@ foreach ($cars as $my_car)
 $brand = $car->getBrand() ;
 $cars_for_this_brand = $brand->listCar();
 
+// manual query
+$db->query("UPDATE car SET model = CONCAT('The ', model) WHERE 1");
 
+// multi query
+$db->MultiQuery("UPDATE car SET model = CONCAT('Das ', model) WHERE 1; UPDATE car SET model = CONCAT('Le ', model) WHERE 1");
 ```
 
 Custom class
@@ -87,7 +91,6 @@ class EzDBCar extend EzDBObj
   }
 
 }
-
 ```
 
 Advanced Query
@@ -107,7 +110,6 @@ foreach ($cars_names as $car_name)
 {
   print $car_name->title;
 }
-
 ```
 
 Cache
@@ -131,9 +133,7 @@ Master/Slave MySQL Server
 EzDB support Master/Slave MySQL configuration. You can setup a slave mysql configuration that is READ ONLY. EzDB will connect to the right server automatically.
 
 ```php
-
 $db->setReadOnlyConfiguration(DB_USER_READ_ONLY, DB_PASSWORD_READ_ONLY, DB_NAME_READ_ONLY, DB_HOST_READ_ONLY, DB_PORT_READ_ONLY);
-
 ```
 
 Debug and Query Log
@@ -181,12 +181,8 @@ $db->fill_list_with_primary_key = true;
 ```php
 $db->auto_get_found_rows = true;
 $total = $db->GetAffectedRows();
-
 ```
-- EzDB can automaticelly set SQL_CALC_FOUND_ROWS in each SQL query so that you can findout how much entry are found in your query:
+- EzDB can automatically set SQL_CALC_FOUND_ROWS in each SQL query so that you can findout how much entry are found in your query:
 ```php
 $db->auto_get_found_rows = true;
 ```
-
-
-
