@@ -1,7 +1,7 @@
 ezdb
 ====
 
-EzDB is a mysql helper for PHP.
+EzDB is a easy to use mysql helper for PHP.
 
 In most project :
 -	90% of MySQL query are simple and boring query like SELECT * FROM table WHERE primary_key = 42.
@@ -9,11 +9,13 @@ In most project :
 
 EzDB allow you to do the first 90% of query with a simple and easy to use PHP API and let you use regular SQL for the rest.
 
+It is build with performance in mind and can bu used with heavy load services.
+
 Why ?
 -------
 
-1 - SQL is not a bad language and should not avoid at all cost.
-2 – Developpers are lazy and write too simple query is anoying.
+-	SQL is not a bad language and should not avoid at all cost.
+-	Developpers are lazy and write too simple query is anoying.
 
 Requirement :
 -------
@@ -106,5 +108,53 @@ foreach ($cars_names as $car_name)
   print $car_name->title;
 }
 
+```
+
+Cache
+-------
+
+First EzDB can cache mysql result for you. You just need to register which tables can be cached and for how long.
+
+```php
+
+$db->AddCachedTable('brand', 3600 /* 3600 secondes cache, default is 300 */);
 
 ```
+
+As EzDB only connect to mysql server when needed, if you cache the right table you can easily create pages that can render without connecting to mysql. This is especially interesting for a front page.
+
+Master/Slave MySQL Server
+-------
+
+EzDB support Master/Slave MySQL configuration. You can setup a slave mysql configuration that is READ ONLY. EzDB will connect to the right server automatically.
+
+```php
+
+$db->setReadOnlyConfiguration(DB_USER_READ_ONLY, DB_PASSWORD_READ_ONLY, DB_NAME_READ_ONLY, DB_HOST_READ_ONLY, DB_PORT_READ_ONLY);
+
+```
+
+Debug and Query Log
+-------
+
+When you developpe your service, it can be annoying to suffer from deprecated cache (like if you change your database scheme and ezdb still not aware of it).
+To avoid this you can:
+ - Disable cache completely
+```php
+$db->no_cache = true;
+```
+ - Adjust default TTL to a lower value (300 seconds by default)
+```php
+$db->default_cache_ttl = 60;
+```
+
+To check what is hapening between ezdb and your mysql server, you can also enable query log:
+```php
+$db->enable_query_log = true;
+$db->query_log_path = '/var/log/ezdb';
+```
+
+All SQL query will be print on screen and stored on disk.
+
+
+
