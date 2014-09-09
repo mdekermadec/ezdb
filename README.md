@@ -3,25 +3,27 @@ EzDB
 
 EzDB is a easy to use mysql helper for PHP.
 
-In most project :
+Philosophy behind this project is clear: let developers focus on where they add values.
+
+In most project:
  - 90% of MySQL query are simple and boring query like SELECT * FROM table WHERE primary_key = 42.
  - The rest are more advance query with JOIN, ORDER, GROUP BY and other stuff like this
 
 EzDB allow you to do the first 90% of query with a simple and easy to use PHP API and let you use regular SQL for the rest.
 
-It is build with performance in mind and can bu used with heavy load services.
+It is build with performance in mind and is already used in many heavy load services.
 
 Why ?
 -------
 
- - SQL is not a bad language and should not avoid at all cost.
+ - SQL is not a bad language and should not be avoid at all cost.
  - Developpers are lazy and write too simple query is anoying.
 
 Requirement :
 -------
 
  - EzDB need APC
- - You must configure primary key in your mysql table
+ - You should configure primary key in your mysql table to enable object magic methods.
 
 Basic Usage :
 -------
@@ -31,7 +33,7 @@ Basic Usage :
 $db = new EzDB(DB_USER, DB_PASSWORD, DB_NAME, DB_HOST, DB_PORT);
 
 // fetch
-$car = $db->get->car(42) ; // get car with primary key 42
+$car = $db->get->car(42); // get car with primary key 42
 
 // update
 $car->model = "My Model";
@@ -44,7 +46,7 @@ $new_car = $car->duplicate() ;
 $new_car->delete() ; 
 
 // create
-$datas = array('model' => 'Famous Brand') ;
+$datas = array('model' => 'Famous Model') ;
 $famous_car = $db->create->car($datas) ;
 
 // query with a join works, you get sub objects for each JOIN
@@ -91,12 +93,16 @@ class EzDBCar extend EzDBObj
   }
 
 }
+
+$car = $db->get->car(42);
+
+$car->print();
 ```
 
 Advanced Query
 -------
 
-Some SQL query return a result that have no link with a table, in this case magic method will not exist.
+Some SQL query return a result that have no link with a table, in this case magic method will not be available.
 
 ```php
 
@@ -115,14 +121,14 @@ foreach ($cars_names as $car_name)
 Cache
 -------
 
-First EzDB can cache mysql result for you. You just need to register which tables can be cached and for how long.
+EzDB can cache mysql result for you. To do that, you need to register which tables can be cached and for how long.
 
 ```php
 // enable cache for table brand 
 $db->AddCachedTable('brand', 3600 /* 3600 secondes cache, default is 300 */);
 
 // disable cache for table car 
-$db->DeleteCachedTable('car')
+$db->DeleteCachedTable('car');
 ```
 
 As EzDB only connect to mysql server when needed, if you cache the right table you can easily create pages that can render without connecting to mysql. This is especially interesting for a front page.
@@ -134,6 +140,18 @@ EzDB support Master/Slave MySQL configuration. You can setup a slave mysql confi
 
 ```php
 $db->setReadOnlyConfiguration(DB_USER_READ_ONLY, DB_PASSWORD_READ_ONLY, DB_NAME_READ_ONLY, DB_HOST_READ_ONLY, DB_PORT_READ_ONLY);
+
+// this will connect to read server
+$car = $db->get->car(42);
+
+$car->model = "Model 42";
+
+// this will switch mysql server to to read/write server (default server)
+$car->save();
+
+// if you get another car, connection will remain on read/write server
+$car = $db->get->car(21);
+
 ```
 
 Debug and Query Log
@@ -161,7 +179,7 @@ All SQL query will be print on screen and stored on disk.
 Class Loader
 -------
 
-You can tell ezdb where you stored your custom EzDB class:
+You can tell ezdb where you store your custom EzDB class:
 ```php
 $db->autoload_class_path = '/var/www/project/class';
 ```
@@ -169,7 +187,6 @@ Class loader work this way:
  - PHP filename must be name of table.
  - If in table name, there is a underscore ( _ ), it will optionally cut this to check sub directories.
  - If file found it is require once and if a class with according name: EzDB + table name, it will be used as EzDB custom class.
-EzDB will look into this directory for 
 
 Other options
 -------
@@ -182,7 +199,7 @@ $db->fill_list_with_primary_key = true;
 $db->auto_get_found_rows = true;
 $total = $db->GetAffectedRows();
 ```
-- EzDB can automatically set SQL_CALC_FOUND_ROWS in each SQL query so that you can findout how much entry are found in your query:
+- to change default cache TTL, 300 seconds by default:
 ```php
-$db->auto_get_found_rows = true;
+$db->default_cache_ttl = 300;
 ```
