@@ -269,6 +269,7 @@ class EzDB
   public  $cached_table;
   public  $dbkey;
   public  $no_cache = false;
+  public  $default_cache_ttl = 300;
 
   // connection level
   const NONE = 0;
@@ -416,8 +417,10 @@ class EzDB
     return false;
   }
 
-  public  function AddCachedTable($table_name, $ttl = 60)
+  public  function AddCachedTable($table_name, $ttl = false)
   {
+    if ($ttl === false)
+      $tll = $this->default_cache_ttl;
     $this->cached_table[$table_name] = $ttl;
   }
 
@@ -898,7 +901,7 @@ binary_        254
     // store it in cache
     $table_class_assoc[$table_name]['class_name'] = $class_name;
     $table_class_assoc[$table_name]['class_path'] = $class_path;
-    apc_store($key, $table_class_assoc);
+    apc_store($key, $table_class_assoc, $this->default_cache_ttl);
 
     return $class_name;
   }
@@ -953,7 +956,7 @@ binary_        254
                                             'fields_infos' => $fields_infos);
       }
 
-    apc_store($key, $tables_infos);
+    apc_store($key, $tables_infos, $this->default_cache_ttl);
 
     return $tables_infos;
   }
