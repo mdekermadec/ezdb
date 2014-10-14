@@ -743,6 +743,8 @@ binary_        254
               $this->initEzDBObj($sub_obj);
         //}
       }
+    // clean object if needed (happen if object just have been stored via apc)
+    unset($obj->_ezdb_infos);
     return $obj;
   }
 
