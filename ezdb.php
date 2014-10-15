@@ -650,7 +650,7 @@ binary_        254
       return (float)$value;
 
     // datetime
-    if ($field->type == 12)
+    if ($field->type == 12 && $value != false)
       return new EzDBDateTime($value);
     
     // text/blob varchar char/binary
@@ -1138,10 +1138,13 @@ class EzDBObj
   {
     static $infos;
 
+    $hash = spl_object_hash($this);
     if ($_infos !== null)
-      $infos = $_infos;
+    {
+      $infos[$hash] = $_infos;
+    }
 
-    return $infos;
+    return $infos[$hash];
   }
 
   // override this to perform custom init code
@@ -1169,10 +1172,9 @@ class EzDBObj
 
   function save($values = array())
   {
-    var_dump($this->_ezdb['original_fields_values']);
-
     $primary_key = $this->db->getPrimaryKey($this->_ezdb['table_name']);
     $original_fields_values = $this->_ezdb['original_fields_values'];
+
     // detect update fields
     $updated_fields = array();
     foreach ($original_fields_values as $name => &$value)
