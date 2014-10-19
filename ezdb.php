@@ -378,6 +378,11 @@ class EzDB
     $this->Query('SET time_zone = "Europe/Paris"', EzDB::READ);
   }
 
+  function ping()
+  {
+    $this->Query('SELECT NOW( )', EzDB::READ);
+  }
+
   function reconnect($required_level)
   {
     if ($this->mysqli != false)
