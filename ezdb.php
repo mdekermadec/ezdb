@@ -262,6 +262,7 @@ class EzDB
   public  $enable_query_cache = true;
   public  $fill_list_with_primary_key = false;
   public  $autoload_class_path = false;
+  public  $table_prefix = false;
 
   //internal
   public  $mysqli;
@@ -325,9 +326,6 @@ class EzDB
     if (isset($_GET['_no_cache']) && $_GET['_no_cache'] == '1')
       $this->no_cache = true;
 
-    // init tables infos
-    $this->tables_infos = $this->getTablesInfos();
-
     $this->query_log_file = "sql_".$this->dbkey.".log";
 
     // class autoloader
@@ -351,7 +349,7 @@ class EzDB
       $required_level = EzDB::WRITE;   
     // current connection is enough
     if ($this->current_connection_level >= $required_level)
-      return;
+      return;   
     // we need to reconnect
     $time_start = microtime(true);    
     if ($this->mysqli !== false)
@@ -376,6 +374,9 @@ class EzDB
     $this->current_connection_level = $required_level;
 
     $this->Query('SET time_zone = "Europe/Paris"', EzDB::READ);
+
+    // init tables infos
+    $this->tables_infos = $this->getTablesInfos();    
   }
 
   function ping()
@@ -584,7 +585,7 @@ class EzDB
     }
 
     // do we need to put result in cache ?
-    if ($this->enable_query_cache && $table_name && isset($this->cached_table[$table_name]))
+    if (!$this->no_cache && $this->enable_query_cache && $table_name && isset($this->cached_table[$table_name]))
       apc_store($key, $array, $this->cached_table[$table_name]);
 
     if ($ezdb_mode)
@@ -605,7 +606,7 @@ class EzDB
       if (is_array($ezdb_metas))
       {
         if (isset($ezdb_metas['compress']) && $ezdb_metas['compress'] == 1)
-          $value = gzinflate($value);
+          $value = gzuncompress(substr($value, 4));//gzinflate($value);
         if (isset($ezdb_metas['type']) && $ezdb_metas['type'] == 'json')
           return json_decode($value);
         if (isset($ezdb_metas['type']) && $ezdb_metas['type'] == 'json_array')
@@ -679,7 +680,7 @@ binary_        254
       if (is_array($ezdb_metas))
       {
         if (isset($ezdb_metas['compress']) && $ezdb_metas['compress'] == 1)
-          $value = gzdeflate($value);
+          $value = "\x1f\x8b\x08\x00".gzcompress($value);//gzdeflate($value);
         if (isset($ezdb_metas['type']) && $ezdb_metas['type'] == 'json')
           return json_encode($value);
       }
@@ -735,7 +736,8 @@ binary_        254
     //$obj->db = $this;
     $obj->EZdbInit();
     // init sub ezdb objects
-    $sub_ezdb_obj = $obj->getInfos()['sub_ezdb_obj'];
+    $sub_ezdb_obj = $obj->getInfos();
+    $sub_ezdb_obj = $sub_ezdb_obj['sub_ezdb_obj'];
     if ($sub_ezdb_obj)
       foreach ($sub_ezdb_obj as $sub_table_name)
       {
@@ -908,7 +910,8 @@ binary_        254
     // store it in cache
     $table_class_assoc[$table_name]['class_name'] = $class_name;
     $table_class_assoc[$table_name]['class_path'] = $class_path;
-    apc_store($key, $table_class_assoc, $this->default_cache_ttl);
+    if (!$this->no_cache)
+      apc_store($key, $table_class_assoc, $this->default_cache_ttl);
 
     return $class_name;
   }
@@ -940,10 +943,22 @@ binary_        254
         return $tables_infos;
     }
 
+    if ($no_cache)
+    {
+      $old_no_cache = $this->no_cache;
+      $this->no_cache = true;
+    }
+    $tables_infos_datas = $this->ListFromSql('SHOW TABLES;', 'stdClass', '#ezdbinternal#');
+    if ($no_cache)
+      $this->no_cache = $old_no_cache;
+
     // foreach tables
-    foreach ($this->ListFromSql('SHOW TABLES;', 'stdClass', '#ezdbinternal#') as $obj)
+    foreach ($tables_infos_datas as $obj)
       foreach ((array)$obj as $table_name)
       {
+        if ($this->table_prefix !== false && strrpos($table_name, $this->table_prefix) !== 0)
+          continue;
+
         // get tables infos
         //$fields_infos = $this->ListFromSql('DESCRIBE `' . addslashes($table_name) . '`;', 'stdClass', '#ezdbinternal#', 'Field', true);
         $fields_infos = $this->ListFromSql('SHOW FULL COLUMNS FROM `' . addslashes($table_name) . '`;', 'stdClass', '#ezdbinternal#', 'Field', true);
@@ -963,7 +978,8 @@ binary_        254
                                             'fields_infos' => $fields_infos);
       }
 
-    apc_store($key, $tables_infos, $this->default_cache_ttl);
+    if (!$this->no_cache)
+      apc_store($key, $tables_infos, $this->default_cache_ttl);
 
     return $tables_infos;
   }
