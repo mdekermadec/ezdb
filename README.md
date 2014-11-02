@@ -188,6 +188,15 @@ Class loader work this way:
  - If in table name, there is a underscore ( _ ), it will optionally cut this to check sub directories.
  - If file found it is require once and if a class with according name: EzDB + table name, it will be used as EzDB custom class.
 
+Meta data
+-------
+
+You can add meta data via table row comment, this meta data help EzDB do some automatic data treatment:
+
+ - compress=1: EzDB will compress and decompress data on the fly
+ - type=json: EzDB will json encode/decode data on the fly
+ - type=json_array: EzDB will json encode/decode as an array data on the fly
+
 Other options
 -------
  - When listing a table, you can ask EzDB to use primary key value a key index:
