@@ -17,7 +17,7 @@ Why ?
 -------
 
  - SQL is not a bad language and should not be avoid at all cost.
- - Developpers are lazy and write too simple query is anoying.
+ - Developpers are lazy and write simple query is anoying.
 
 Requirement :
 -------
@@ -60,7 +60,7 @@ foreach ($cars as $my_car)
 	print "<h4>{$my_car->model} – {$my_car->brand->name}</h4>";
 }
 
-// auto get query
+// auto get column from another table (using foriegn key)
 $brand = $car->getBrand() ;
 $cars_for_this_brand = $brand->listCar();
 
@@ -81,7 +81,7 @@ By default object class returned by EzDB command are EzDBObj. If you need to use
 class EzDBCar extend EzDBObj
 {
 
-  // thie method will be called when object his instanciate
+  // this method will be called when object is instanciate
   function EZdbInit()
   {
 
@@ -186,7 +186,7 @@ $db->autoload_class_path = '/var/www/project/class';
 Class loader work this way:
  - PHP filename must be name of table.
  - If in table name, there is a underscore ( _ ), it will optionally cut this to check sub directories.
- - If file found it is require once and if a class with according name: EzDB + table name, it will be used as EzDB custom class.
+ - If file found it is require once and if a class with according name: EzDB + table name exist, it will be used as EzDB custom class.
 
 Meta data
 -------
@@ -199,7 +199,7 @@ You can add meta data via table row comment, this meta data help EzDB do some au
 
 Other options
 -------
- - When listing a table, you can ask EzDB to use primary key value a key index:
+ - When listing a table, you can ask EzDB to use primary key value a key index for php array:
 ```php
 $db->fill_list_with_primary_key = true;
 ```
