@@ -606,7 +606,11 @@ class EzDB
       if (is_array($ezdb_metas))
       {
         if (isset($ezdb_metas['compress']) && $ezdb_metas['compress'] == 1)
-          $value = gzuncompress(substr($value, 4));//gzinflate($value);
+        {
+          $value_compress = @gzuncompress(substr($value, 4));//gzinflate($value);
+          if ($value_compress !== false)
+            $value = $value_compress;
+        }
         if (isset($ezdb_metas['type']) && $ezdb_metas['type'] == 'json')
           return json_decode($value);
         if (isset($ezdb_metas['type']) && $ezdb_metas['type'] == 'json_array')
@@ -818,6 +822,10 @@ binary_        254
 
   function getPrimaryKey($table_name)
   {
+    // first we fetch in table infos allowing cache
+    if (!isset($this->tables_infos[$table_name]))
+      $this->tables_infos = $this->getTablesInfos();
+    // not found, retry with cache disabled
     if (!isset($this->tables_infos[$table_name]))
       $this->tables_infos = $this->getTablesInfos(true);
     if (!isset($this->tables_infos[$table_name]))
