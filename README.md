@@ -9,7 +9,7 @@ In most project:
  - 90% of MySQL query are simple and boring query like SELECT * FROM table WHERE primary_key = 42.
  - The rest are more advance query with JOIN, ORDER, GROUP BY and other stuff like this
 
-EzDB allow you to do the first 90% of query with a simple and easy to use PHP API and let you use regular SQL for the rest.
+EzDB allow you to do 90% of query with a simple and easy to use PHP API and let you use regular SQL for the rest.
 
 It is build with performance in mind and is already used in many heavy load services.
 
@@ -17,7 +17,7 @@ Why ?
 -------
 
  - SQL is not a bad language and should not be avoid at all cost.
- - Developpers are lazy and write simple query is anoying.
+ - Developpers are lazy and write simple query is annoying.
 
 Requirement :
 -------
@@ -60,7 +60,7 @@ foreach ($cars as $my_car)
 	print "<h4>{$my_car->model} – {$my_car->brand->name}</h4>";
 }
 
-// auto get column from another table (using foriegn key)
+// auto get column from another table (using foreign key)
 $brand = $car->getBrand() ;
 $cars_for_this_brand = $brand->listCar();
 
@@ -74,7 +74,7 @@ $db->MultiQuery("UPDATE car SET model = CONCAT('Das ', model) WHERE 1; UPDATE ca
 Custom class
 -------
 
-By default object class returned by EzDB command are EzDBObj. If you need to use custom class, the name must be EZDB followed by name of the table, and the class must extends EzDB:
+By default object class returned by EzDB command are EzDBObj. If you need to use custom class, classname must be EZDB followed by name of the table, and class must extend EzDBObj:
 
 ```php
 
@@ -102,7 +102,7 @@ $car->print();
 Advanced Query
 -------
 
-Some SQL query return a result that have no link with a table, in this case magic method will not be available.
+Some SQL query return a result that have no link with any table, in this case magic method (delete(), duplicate(), ...) will not be available.
 
 ```php
 
@@ -110,7 +110,7 @@ $car_count = $db->ObjectFromSql("SELECT COUNT(*) AS ct FROM car");
 
 print $car_count->ct;
 
-$cars_names = $db->listFromSql("SELECT title FROM brand WHERE title like 'p%' ORDER BY title");
+$cars_names = $db->listFromSql("SELECT title FROM brand WHERE title LIKE 'p%' ORDER BY title");
 
 foreach ($cars_names as $car_name)
 {
@@ -157,7 +157,7 @@ $car = $db->get->car(21);
 Debug and Query Log
 -------
 
-When you developpe your service, it can be annoying to suffer from deprecated cache (like if you change your database scheme and ezdb still not aware of it).
+When you develope your service, it can be annoying to suffer from deprecated cache (like if you change your database scheme and ezdb still not aware of it).
 To avoid this you can:
  - Disable cache completely
 ```php
