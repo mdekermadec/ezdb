@@ -596,6 +596,9 @@ class EzDB
 
   function cast($field, $value)
   {
+    // null value should stay null
+    if ($value === null)
+      return null;    
     // first we try to cast from information put in comment
     if (isset($this->tables_infos[$field->table]['fields_infos'][$field->name]))
     {
@@ -674,6 +677,9 @@ binary_        254
 
   function uncast($table_name, $field_name, $value)
   {
+    // null value should stay null
+    if ($value === null)
+      return null;
     // first we try to cast from information put in comment
     if (isset($this->tables_infos[$table_name]['fields_infos'][$field_name]))
     {
