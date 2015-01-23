@@ -151,8 +151,12 @@ class EzDBQueryBuilder
   function update($obj, $table_name, $cond, $fields)
   {
     $sql = '';
+    $infos = $this->db->getTableInfo($table_name);
     foreach ($fields as $name)
     {
+      // we unknow skip fields
+      if (!array_key_exists($name, $infos))
+        continue;
       if ($sql != '')
         $sql .= ' , ';
       $escp_val = $this->db->PhpToDB( $this->db->uncast($table_name, $name, $obj->$name) );
@@ -214,6 +218,7 @@ class EzDBQueryBuilder
 
   function select($class_name, $table_name, $primary_key, $cond, $limit = null, $order = null)
   {
+    $infos = $this->db->getTableInfo($table_name);
     // generate query
     if ($this->db->auto_get_found_rows == true)
       $sql = "SELECT SQL_CALC_FOUND_ROWS * FROM `{$table_name}` WHERE 1 ";
@@ -221,6 +226,9 @@ class EzDBQueryBuilder
       $sql = "SELECT * FROM `{$table_name}` WHERE 1 ";
     foreach ($cond as $name => $val)
     {
+            // we unknow skip fields
+      if (!array_key_exists($name, $infos))
+        continue;
       if ($val === null)
         $sql .= ' AND `' . $name . '` IS NULL ';
       else
@@ -559,6 +567,9 @@ class EzDB
           $obj->{$field->name} = $this->cast($field, $row[$idx]);
         else if ($field->table !== false && $field->name !== false)
         {
+          // we don't create sub entry if for null 
+          //if (!isset($obj->{$field->table}) && $row[$idx] === null)
+          //  continue;
           if (!isset($obj->{$field->table}))
           {
             $sub_class_name = $this->getClassName($field->table);
