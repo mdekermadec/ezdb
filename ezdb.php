@@ -205,11 +205,15 @@ class EzDBQueryBuilder
 
   function delete($table_name, $cond)
   {
+    $infos = $this->db->getTableInfo($table_name);
     if (!is_array($cond) || count($cond) == 0)
       trigger_error("EzDB: missing delete condition", E_USER_ERROR);
     $sql = "DELETE FROM `{$table_name}` WHERE 1 ";
     foreach ($cond as $name => $val)
     {
+      // we unknow skip fields
+      if (!array_key_exists($name, $infos))
+        continue;
       $escp_val = $this->db->PhpToDB( $this->db->uncast($table_name, $name, $val) );
       $sql .= ' AND `' . $name . '` = ' . $escp_val . ' ';
     }
@@ -271,6 +275,7 @@ class EzDB
   public  $fill_list_with_primary_key = false;
   public  $autoload_class_path = false;
   public  $table_prefix = false;
+  public  $debug_callback = false;
 
   //internal
   public  $mysqli;
@@ -408,14 +413,17 @@ class EzDB
 
   function debug($msg)
   {
-    if (function_exists('debug'))
-      debug($msg);
+    if ($this->debug_callback !== false)
+      $this->debug_callback($msg);
     else
-      print htmlspecialchars($msg)."<br />\r\n";
+    {
+      print htmlspecialchars($msg, ENT_COMPAT|ENT_IGNORE, "UTF-8")."<br />\r\n";
+    }
   }
 
   function queryLog($time_start, $time_end, $query)
   {
+    //var_dump("queryLog: {$query}");
     if (!$this->enable_query_log)
       return;
     $this->debug(sprintf("Execution Time: [%.04f] sec\r\nQuery: %s", $time_end - $time_start, $query));
@@ -700,10 +708,10 @@ binary_        254
       parse_str($field_info->Comment, $ezdb_metas);
       if (is_array($ezdb_metas))
       {
+        if (isset($ezdb_metas['type']) && $ezdb_metas['type'] == 'json')
+          $value = json_encode($value);
         if (isset($ezdb_metas['compress']) && $ezdb_metas['compress'] == 1)
           $value = "\x1f\x8b\x08\x00".gzcompress($value);//gzdeflate($value);
-        if (isset($ezdb_metas['type']) && $ezdb_metas['type'] == 'json')
-          return json_encode($value);
       }
     }
     return (string)$value;
@@ -858,6 +866,13 @@ binary_        254
 
   function getTableFields($table_name)
   {
+    // first we fetch in table infos allowing cache
+    if (!isset($this->tables_infos[$table_name]))
+      $this->tables_infos = $this->getTablesInfos();
+    // not found, retry with cache disabled
+    if (!isset($this->tables_infos[$table_name]))
+      $this->tables_infos = $this->getTablesInfos(true);
+    // still not found, should be an error ...    
     if (!isset($this->tables_infos[$table_name]))
       trigger_error("EzDB: table '{$table_name}' not found", E_USER_ERROR);    
     if (isset($this->tables_infos[$table_name]['table_fields']))
@@ -1219,7 +1234,7 @@ class EzDBObj
   function save($values = array())
   {
     $primary_key = $this->db->getPrimaryKey($this->_ezdb['table_name']);
-    $original_fields_values = $this->_ezdb['original_fields_values'];
+    $new_original_fields_values = $original_fields_values = $this->_ezdb['original_fields_values'];
 
     // detect update fields
     $updated_fields = array();
@@ -1227,7 +1242,11 @@ class EzDBObj
     {
       if (!($this->$name == $value) && $name != $primary_key)
       {
+        $new_original_fields_values[$name] = $this->$name;
         $updated_fields[] = $name;
+//        $this->_ezdb['original_fields_values'][$name] = $this->$name;
+      } else {
+        $new_original_fields_values[$name] = $value;
       }
     }
 
@@ -1240,6 +1259,11 @@ class EzDBObj
 
     if ($ret === false)
       return false;
+
+    $_ezdb = $this->getInfos();
+    $_ezdb['original_fields_values'] = $new_original_fields_values;
+    $this->getInfos($_ezdb);
+
     return count($updated_fields);
   }
 
