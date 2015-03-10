@@ -472,15 +472,15 @@ class EzDB
     $this->Connect($required_level);
     $time_start = microtime(true);
     $result = $this->mysqli->multi_query($query);
-    while ($this->mysqli->next_result())
-      ;
+    while ($this->mysqli->more_results())
+      $this->mysqli->next_result();
     $time_end = microtime(true);
 
     // log query if needed
-    $this->queryLog($time_start, $time_end, $sql);
+    $this->queryLog($time_start, $time_end, $query);
 
     if ($result === false)
-      return $this->handleSQLError($sql);
+      return $this->handleSQLError($query);
 
     return true;
   }
@@ -573,7 +573,7 @@ class EzDB
           $obj->{$field->name} = $this->cast($field, $row[$idx]);
         elseif ($field->table == $table_name)
           $obj->{$field->name} = $this->cast($field, $row[$idx]);
-        else if ($field->table !== false && $field->name !== false)
+        else if ($field->table !== false && $field->name !== false && !isset($fields[$field->table]))
         {
           // we don't create sub entry if for null 
           //if (!isset($obj->{$field->table}) && $row[$idx] === null)
@@ -1010,7 +1010,7 @@ binary_        254
         {
           if ($field->Key == 'PRI')
             $primary_key = $field->Field;
-          $table_fields []= $field->Field;
+          $table_fields [$field->Field]= $field->Field;
         }
 
         $tables_infos[$table_name] = array( 'table_fields' => $table_fields,
