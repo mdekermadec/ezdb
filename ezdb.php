@@ -423,6 +423,16 @@ class EzDB
     }
   }
 
+  function trigger_error($message, $level = E_USER_NOTICE, $callcount = 0)
+  {
+    $backtrace = debug_backtrace();
+    $caller = array_pop($backtrace);
+    //$caller = next($backtrace);
+    for ($k = 0; $k < $callcount; $k++)
+      $caller = array_pop($backtrace);
+    trigger_error($message.' in <strong>'.$caller['function'].'</strong> called from <strong>'.$caller['file'].'</strong> on line <strong>'.$caller['line'].'</strong>'."\n<br />error handler", $level);
+  }
+
   function queryLog($time_start, $time_end, $query)
   {
     //var_dump("queryLog: {$query}");
@@ -436,8 +446,8 @@ class EzDB
   function handleSQLError($sql)
   {
     if ($this->mysqli->errno == 2006)
-      trigger_error("EzDB: Query Error: " . $this->mysqli->error . "\r\nQuery was:\r\n{$sql}", E_USER_WARNING);
-    trigger_error("EzDB: Query Error: " . $this->mysqli->error . "\r\nQuery was:\r\n{$sql}", E_USER_WARNING);
+      $this->trigger_error("EzDB: Query Error: " . $this->mysqli->error . "\r\nQuery was:\r\n{$sql}", E_USER_WARNING, 1);
+    $this->trigger_error("EzDB: Query Error: " . $this->mysqli->error . "\r\nQuery was:\r\n{$sql}", E_USER_WARNING, 1);
     return false;
   }
 
