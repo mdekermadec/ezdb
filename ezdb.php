@@ -694,10 +694,10 @@ char_        254
 binary_        254
 */
     // boolean
-    if ($field->type == 1 && ($value === 1 || $value === 0))
+    if ($field->type == 1)
       return (bool)$value;
     // int
-    if ($field->type == 1 || $field->type == 2 || $field->type == 3)
+    if ($field->type == 2 || $field->type == 3)
       return (int)$value;
     // float
     if ($field->type == 4 || $field->type == 5 || $field->type == 246)
