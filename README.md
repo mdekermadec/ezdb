@@ -69,6 +69,10 @@ $db->query("UPDATE car SET model = CONCAT('The ', model) WHERE 1");
 
 // multi query
 $db->MultiQuery("UPDATE car SET model = CONCAT('Das ', model) WHERE 1; UPDATE car SET model = CONCAT('Le ', model) WHERE 1");
+
+// count query
+$nb_car = $db->count->car->model("My Model");
+
 ```
 
 Custom class
