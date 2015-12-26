@@ -1,12 +1,12 @@
 EzDB
 ====
 
-EzDB is a easy to use mysql helper for PHP.
+EzDB is an easy to use mysql helper for PHP.
 
 Philosophy behind this project is clear: let developers focus on where they add values.
 
 In most project:
- - 90% of MySQL query are simple and boring query like SELECT * FROM table WHERE primary_key = 42.
+ - 90% of MySQL query are simple and boring SQL queries like SELECT * FROM table WHERE primary_key = 42.
  - The rest are more advance query with JOIN, ORDER, GROUP BY and other stuff like this
 
 EzDB allow you to do 90% of query with a simple and easy to use PHP API and let you use regular SQL for the rest.
