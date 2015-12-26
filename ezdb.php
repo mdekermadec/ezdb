@@ -230,7 +230,7 @@ class EzDBQueryBuilder
       $sql = "SELECT * FROM `{$table_name}` WHERE 1 ";
     foreach ($cond as $name => $val)
     {
-            // we unknow skip fields
+      // we unknow skip fields
       if (!array_key_exists($name, $infos))
         continue;
       if ($val === null)
@@ -276,6 +276,8 @@ class EzDB
   public  $autoload_class_path = false;
   public  $table_prefix = false;
   public  $debug_callback = false;
+  public  $query_cache_path = false;  
+
 
   //internal
   public  $mysqli;
@@ -471,9 +473,26 @@ class EzDB
   {
     $this->Connect($required_level);
     $time_start = microtime(true);
-    $result = $this->mysqli->multi_query($query);
-    while ($this->mysqli->more_results())
-      $this->mysqli->next_result();
+
+    /* execute multi query */
+    $result = false;
+    if ($this->mysqli->multi_query($query)) {
+      $result = true;
+      do {
+          if ($this->mysqli->use_result()) {
+              $result->free();
+          }
+          if ($this->mysqli->more_results() == false)
+            break;
+      } while ($result = $this->mysqli->next_result());
+    } else {
+      return false; // first query failed
+    }
+
+    // todo: check error ?
+    //if ($this->mysqli->error != '')
+    //  return false;
+
     $time_end = microtime(true);
 
     // log query if needed
@@ -605,7 +624,10 @@ class EzDB
 
     // do we need to put result in cache ?
     if (!$this->no_cache && $this->enable_query_cache && $table_name && isset($this->cached_table[$table_name]))
+    {
       apc_store($key, $array, $this->cached_table[$table_name]);
+      $this->addCacheTag($table_name, $key);
+    }
 
     if ($ezdb_mode)
       return $this->initEzDBObjArray($array);
@@ -624,7 +646,7 @@ class EzDB
       // metas are store in field comment as a query string
       $field_info = $this->tables_infos[$field->table]['fields_infos'][$field->name];
       $ezdb_metas = false;
-      parse_str($field_info->Comment, $ezdb_metas);
+      parse_str($field_info['comment'], $ezdb_metas);
       if (is_array($ezdb_metas))
       {
         if (isset($ezdb_metas['compress']) && $ezdb_metas['compress'] == 1)
@@ -672,10 +694,10 @@ char_        254
 binary_        254
 */
     // boolean
-    if ($field->type == 1)
+    if ($field->type == 1 && ($value === 1 || $value === 0))
       return (bool)$value;
     // int
-    if ($field->type == 2 || $field->type == 3)
+    if ($field->type == 1 || $field->type == 2 || $field->type == 3)
       return (int)$value;
     // float
     if ($field->type == 4 || $field->type == 5 || $field->type == 246)
@@ -705,7 +727,7 @@ binary_        254
       // metas are store in field comment as a query string
       $field_info = $this->tables_infos[$table_name]['fields_infos'][$field_name];
       $ezdb_metas = false;
-      parse_str($field_info->Comment, $ezdb_metas);
+      parse_str($field_info['comment'], $ezdb_metas);
       if (is_array($ezdb_metas))
       {
         if (isset($ezdb_metas['type']) && $ezdb_metas['type'] == 'json')
@@ -808,12 +830,20 @@ binary_        254
 
   function UpdateFromArray($obj, $table_name, $cond, $fields)
   {
+    if ($this->enable_query_cache && $table_name && isset($this->cached_table[$table_name]))
+    {
+      $this->deleteCacheTag($table_name);
+    }
     $sql = $this->queryBuilder->update($obj, $table_name, $cond, $fields);
     return $this->Query($sql);
   }
 
-   function CreateFromArray($class_name, $table_name, $primary_key, $values, $on_duplicate_key_update = false)
+  function CreateFromArray($class_name, $table_name, $primary_key, $values, $on_duplicate_key_update = false)
   {
+    if ($this->enable_query_cache && $table_name && isset($this->cached_table[$table_name]))
+    {
+      $this->deleteCacheTag($table_name);
+    }    
     $sql = $this->queryBuilder->create($class_name, $table_name, $primary_key, $values, $on_duplicate_key_update);
     $this->Query($sql);
     $insert_id = $this->mysqli->insert_id;
@@ -824,6 +854,10 @@ binary_        254
 
   function DeleteFromArray($table_name, $cond)
   {
+    if ($this->enable_query_cache && $table_name && isset($this->cached_table[$table_name]))
+    {
+      $this->deleteCacheTag($table_name);
+    }    
     $sql = $this->queryBuilder->delete($table_name, $cond);
     return $this->Query($sql);
   }
@@ -975,6 +1009,18 @@ binary_        254
 
     $key = $this->dbkey.'#tables_infos';
 
+    // try from query_cache_path
+    if ($this->query_cache_path !== false && $tables_infos == false && !$this->no_cache && !$no_cache)
+    {
+      $php_cache_path = $this->query_cache_path.'/'.$key.'.php';
+      if (file_exists($php_cache_path))
+      {
+        $tables_infos = include($php_cache_path);
+        if ($tables_infos !== false)
+          return $tables_infos;
+      }
+    }
+
     // try to fetch from apc
     if ($tables_infos == false && !$this->no_cache && !$no_cache)
     {
@@ -1001,22 +1047,38 @@ binary_        254
 
         // get tables infos
         //$fields_infos = $this->ListFromSql('DESCRIBE `' . addslashes($table_name) . '`;', 'stdClass', '#ezdbinternal#', 'Field', true);
-        $fields_infos = $this->ListFromSql('SHOW FULL COLUMNS FROM `' . addslashes($table_name) . '`;', 'stdClass', '#ezdbinternal#', 'Field', true);
+        $fields_infos = array();
+        $fields_infos_objs = $this->ListFromSql('SHOW FULL COLUMNS FROM `' . addslashes($table_name) . '`;', 'stdClass', '#ezdbinternal#', 'Field', true);
+        foreach ($fields_infos_objs as $field => $field_info)
+        {
+          foreach ($field_info as $k => $v)
+          {
+            if ($k == 'Comment' || $k == 'Key' || $k == 'Field')
+              $fields_infos[$field][strtolower($k)] = $v;
+          }
+        }
         
         // prepara primary key and fields list
         $primary_key = false;
         $table_fields = array();
         foreach ($fields_infos as $field)
         {
-          if ($field->Key == 'PRI')
-            $primary_key = $field->Field;
-          $table_fields [$field->Field]= $field->Field;
+          if ($field['key'] == 'PRI')
+            $primary_key = $field['field'];
+          $table_fields [/*$field['field']*/]= $field['field'];
         }
 
         $tables_infos[$table_name] = array( 'table_fields' => $table_fields,
                                             'primary_key' => $primary_key,
                                             'fields_infos' => $fields_infos);
       }
+
+    if ($this->query_cache_path !== false && !$this->no_cache)
+    {
+      $php_cache_path = $this->query_cache_path.'/'.$key.'.php';
+      $php_cache_data = '<?php $return = '.var_export($tables_infos, true).'; return $return;';
+      file_put_contents($php_cache_path, $php_cache_data);
+    }
 
     if (!$this->no_cache)
       apc_store($key, $tables_infos, $this->default_cache_ttl);
@@ -1044,7 +1106,7 @@ binary_        254
 
    function GetFoundsRow()
   {
-    $res = $this->QueryToObj('SELECT FOUND_ROWS() AS nb;');
+    $res = $this->ObjectFromSql('SELECT FOUND_ROWS() AS nb;');
     return intval($res->nb);
   }
 
@@ -1057,6 +1119,29 @@ binary_        254
   function decrypt($_id)
   {
     return openssl_decrypt(hex2bin($_id), 'aes-256-cbc', SHARED_SECRET, OPENSSL_RAW_DATA, SHARED_IV);
+  }
+
+  // cache invalidation
+  function addCacheTag($tag, $key)
+  {
+    $tagkey = $this->dbkey.'#cache_tag#'.$tag;
+
+    $tagkeys = apc_fetch($tagkey, $success);
+    if ($success === false)
+      $tagkeys = array();
+
+    $tagkeys[$key] = $key;
+
+    apc_store($tagkey, $tagkeys, $this->default_cache_ttl * 2 + 600);
+  }
+
+  function deleteCacheTag($tag)
+  {
+    $tagkey = $this->dbkey.'#cache_tag#'.$tag;
+
+    $tagkeys = apc_fetch($tagkey, $success);
+    if ($success !== false)
+        apc_delete($tagkeys);
   }
 
   // deprecated
@@ -1121,8 +1206,8 @@ class EzDBObj
       {
         $primary_key = false;
         foreach ($table_info as $field)
-          if ($field->Key == 'PRI')
-            $primary_key = $field->Field;
+          if ($field['key'] == 'PRI')
+            $primary_key = $field['field'];
         if ($primary_key && isset($this->$foreign_key))
           return $this->db->get->$table->$primary_key($this->$foreign_key);
       }
@@ -1240,7 +1325,7 @@ class EzDBObj
     $updated_fields = array();
     foreach ($original_fields_values as $name => &$value)
     {
-      if (!($this->$name == $value) && $name != $primary_key)
+      if (!($this->$name === $value) && $name != $primary_key)
       {
         $new_original_fields_values[$name] = $this->$name;
         $updated_fields[] = $name;
