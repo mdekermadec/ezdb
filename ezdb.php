@@ -131,6 +131,36 @@ class EzDBCreateProxyHelper extends EzDBProxyHelper
 
 }
 
+// Count
+class EzDBCountProxyHelper extends EzDBProxyHelper
+{
+  function doCount($cond)
+  {
+    $this->class_name = 'stdClass';
+    $sql = $this->db->queryBuilder->count($this->class_name, $this->table_name, $this->primary_key, $cond);
+    $obj = $this->db->ObjectFromSql($sql, $this->class_name, $this->table_name, $this->primary_key);
+    if ($obj === false)
+      return false;
+    return $obj->count;
+  }
+
+  function __invoke($cond)
+  {
+    if (!is_array($cond))
+      $cond = array($this->primary_key => $cond);
+    return $this->docount($cond);
+//    return $this->db->ObjectFromArray($this->class_name, $this->table_name, $this->primary_key, $cond);
+  }
+
+  public function __call($method, $args)
+  {
+    $cond = array($method => $args[0]);
+    return $this->docount($cond);
+    //return $this->db->ObjectFromArray($this->class_name, $this->table_name, $this->primary_key, $cond);
+  }
+
+}
+
 // From Public Id
 class EzDBPublicProxyHelper extends EzDBProxyHelper
 {
@@ -156,7 +186,10 @@ class EzDBQueryBuilder
     {
       // we unknow skip fields
       if (!array_key_exists($name, $infos))
+      {
+        trigger_error("field {$name} does not exist in table {$table_name}", E_USER_WARNING);
         continue;
+      }
       if ($sql != '')
         $sql .= ' , ';
       $escp_val = $this->db->PhpToDB( $this->db->uncast($table_name, $name, $obj->$name) );
@@ -180,22 +213,23 @@ class EzDBQueryBuilder
     $sql_dup = '';
     foreach ($values as $name => $val)
     {
-      if (array_key_exists($name, $infos))
+      if (!array_key_exists($name, $infos))
       {
-        if ($sql != '')
-        {
-          $sql .= ' , ';
-          $sql_val .= ' , ';
-          $sql_dup .= ' , ';
-        }
-
-        $escp_val = $this->db->PhpToDB( $this->db->uncast($table_name, $name, $val) );
-
-        $sql .= ' `' . $name . '` ';
-        $sql_val .= ' ' . $escp_val . ' ';
-        $sql_dup .= ' `' . $name . '` = ' . $escp_val . ' ';
-
+        trigger_error("field {$name} does not exist in table {$table_name}", E_USER_WARNING);
+        continue;
       }
+      if ($sql != '')
+      {
+        $sql .= ' , ';
+        $sql_val .= ' , ';
+        $sql_dup .= ' , ';
+      }
+
+      $escp_val = $this->db->PhpToDB( $this->db->uncast($table_name, $name, $val) );
+      $sql .= ' `' . $name . '` ';
+      $sql_val .= ' ' . $escp_val . ' ';
+      $sql_dup .= ' `' . $name . '` = ' . $escp_val . ' ';
+
     }
     $sql = "INSERT INTO `{$table_name}` ({$sql}) VALUES ({$sql_val})";
     if ($on_duplicate_key_update === true)
@@ -213,7 +247,10 @@ class EzDBQueryBuilder
     {
       // we unknow skip fields
       if (!array_key_exists($name, $infos))
+      {
+        trigger_error("field {$name} does not exist in table {$table_name}", E_USER_WARNING);
         continue;
+      }
       $escp_val = $this->db->PhpToDB( $this->db->uncast($table_name, $name, $val) );
       $sql .= ' AND `' . $name . '` = ' . $escp_val . ' ';
     }
@@ -232,7 +269,10 @@ class EzDBQueryBuilder
     {
       // we unknow skip fields
       if (!array_key_exists($name, $infos))
+      {
+        trigger_error("field {$name} does not exist in table {$table_name}", E_USER_WARNING);
         continue;
+      }
       if ($val === null)
         $sql .= ' AND `' . $name . '` IS NULL ';
       else
@@ -257,6 +297,27 @@ class EzDBQueryBuilder
       $sql .= ' LIMIT ' . ((int) $limit[0]) . ', ' . ((int) $limit[1]) . ' ';
     if (is_numeric($limit))
       $sql .= " LIMIT $limit ";
+    return $sql;
+  }
+
+  function count($class_name, $table_name, $primary_key, $cond, $limit = null, $order = null)
+  {
+    $infos = $this->db->getTableInfo($table_name);
+    // generate query
+    $sql = "SELECT COUNT(*) AS count FROM `{$table_name}` WHERE 1 ";
+    foreach ($cond as $name => $val)
+    {
+      // we unknow skip fields
+      if (!array_key_exists($name, $infos))
+        continue;
+      if ($val === null)
+        $sql .= ' AND `' . $name . '` IS NULL ';
+      else
+      {
+        $escp_val = $this->db->PhpToDB( $this->db->uncast($table_name, $name, $val) );
+        $sql .= ' AND `' . $name . '` = ' . $escp_val . ' ';
+      }
+    }
     return $sql;
   }
 
@@ -328,6 +389,7 @@ class EzDB
     $this->list = new EzDBProxyHelperMaker($this, 'list');
     $this->create = new EzDBProxyHelperMaker($this, 'create');
     $this->query = new EzDBProxyHelperMaker($this, 'query');
+    $this->count = new EzDBProxyHelperMaker($this, 'count');
     $this->public = new EzDBProxyHelperMaker($this, 'public');
 
     // auto cache internals
@@ -423,16 +485,6 @@ class EzDB
     }
   }
 
-  function trigger_error($message, $level = E_USER_NOTICE, $callcount = 0)
-  {
-    $backtrace = debug_backtrace();
-    $caller = array_pop($backtrace);
-    //$caller = next($backtrace);
-    for ($k = 0; $k < $callcount; $k++)
-      $caller = array_pop($backtrace);
-    trigger_error($message.' in <strong>'.$caller['function'].'</strong> called from <strong>'.$caller['file'].'</strong> on line <strong>'.$caller['line'].'</strong>'."\n<br />error handler", $level);
-  }
-
   function queryLog($time_start, $time_end, $query)
   {
     //var_dump("queryLog: {$query}");
@@ -446,8 +498,8 @@ class EzDB
   function handleSQLError($sql)
   {
     if ($this->mysqli->errno == 2006)
-      $this->trigger_error("EzDB: Query Error: " . $this->mysqli->error . "\r\nQuery was:\r\n{$sql}", E_USER_WARNING, 1);
-    $this->trigger_error("EzDB: Query Error: " . $this->mysqli->error . "\r\nQuery was:\r\n{$sql}", E_USER_WARNING, 1);
+      trigger_error("EzDB: Query Error: " . $this->mysqli->error . "\r\nQuery was:\r\n{$sql}", E_USER_WARNING);
+    trigger_error("EzDB: Query Error: " . $this->mysqli->error . "\r\nQuery was:\r\n{$sql}", E_USER_WARNING);
     return false;
   }
 
@@ -715,7 +767,8 @@ binary_        254
 
     // datetime
     if ($field->type == 12 && $value != false)
-      return new EzDBDateTime($value);
+      //return new EzDBDateTime($value);
+    return (string)$value;
     
     // text/blob varchar char/binary
     if ($field->type == 252 || $field->type == 253 || $field->type == 254)
@@ -781,7 +834,14 @@ binary_        254
     // pre init sub ezdb objects
     if ($sub_ezdb_obj)
         foreach ($sub_ezdb_obj as $sub_table_name)
-          $this->preInitEzDBObj($obj->$sub_table_name, $this->getTableFields($sub_table_name), $sub_table_name, $this->getPrimaryKey($sub_table_name), false);
+          if ($this->tableExist($sub_table_name))
+          {
+            $sub_table_primary_key = $this->getPrimaryKey($sub_table_name);
+            if ($obj->$sub_table_name->{$sub_table_primary_key} === null)
+              $obj->$sub_table_name = null;
+            else
+              $this->preInitEzDBObj($obj->$sub_table_name, $this->getTableFields($sub_table_name), $sub_table_name, $sub_table_primary_key, false);
+          }
 
     $infos['sub_ezdb_obj'] = $sub_ezdb_obj;
     
@@ -807,7 +867,7 @@ binary_        254
         {
           $class_name = get_class($sub_obj);
           if (is_subclass_of($class_name, 'EzDBObj') || strcasecmp($class_name, 'EzDBObj') === 0)*/
-            if ($sub_obj)
+            if ($sub_obj && $this->tableExist($sub_table_name))
               $this->initEzDBObj($sub_obj);
         //}
       }
@@ -880,6 +940,11 @@ binary_        254
       return '\'' . addslashes($val) . '\'';
   }
 
+  function tableExist($table_name)
+  {
+    return isset($this->tables_infos[$table_name]);
+  }
+
   function getTableInfo($table_name)
   {
     if (!isset($this->tables_infos[$table_name]))
@@ -898,7 +963,10 @@ binary_        254
     if (!isset($this->tables_infos[$table_name]))
       $this->tables_infos = $this->getTablesInfos(true);
     if (!isset($this->tables_infos[$table_name]))
+    {
+      //debug_print_backtrace();
       trigger_error("EzDB: table '{$table_name}' not found", E_USER_ERROR);
+    }
     if (isset($this->tables_infos[$table_name]['primary_key']))
       return $this->tables_infos[$table_name]['primary_key'];
     /*// not found ... let's retry without cache
@@ -918,7 +986,10 @@ binary_        254
       $this->tables_infos = $this->getTablesInfos(true);
     // still not found, should be an error ...    
     if (!isset($this->tables_infos[$table_name]))
+    {
+      debug_print_backtrace();
       trigger_error("EzDB: table '{$table_name}' not found", E_USER_ERROR);    
+    }
     if (isset($this->tables_infos[$table_name]['table_fields']))
       return $this->tables_infos[$table_name]['table_fields'];
     trigger_error("EzDB: tables fields not found for table '{$table_name}'", E_USER_ERROR);
@@ -1299,7 +1370,7 @@ class EzDBObj
     {
       $infos[$hash] = $_infos;
     }
-
+//debug_print_backtrace();
     return $infos[$hash];
   }
 
@@ -1368,7 +1439,12 @@ class EzDBObj
     $table_fields = $this->db->getTableFields($this->_ezdb['table_name']);
     foreach ($values as $k => $v)
     {
-      if (in_array($k, $table_fields) && $k != $primary_key)
+      if (!in_array($k, $table_fields))
+      {
+        trigger_error("field {$k} does not exist in table {$this->_ezdb['table_name']}", E_USER_WARNING);
+        continue;
+      }
+      if ($k != $primary_key)
         $this->$k = $v;
     }
     return $this->db->UpdateFromArray($this, $this->_ezdb['table_name'], array($primary_key => $this->$primary_key), $table_fields);
