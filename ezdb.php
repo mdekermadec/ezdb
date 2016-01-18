@@ -627,61 +627,66 @@ class EzDB
 
     // log query if needed
     $this->queryLog($time_start, $time_end, $sql);
+
+    // store result in an array
+    $array = array();
     
     // extract all field from object and give it to object
     if ($ezdb_mode)
     {
       $fields = $this->getTableFields($table_name);
-    }
-
-    // store result in an array
-    $array = array();
-    //while ($obj = $result->fetch_object($class_name))
-    while ($row = $result->fetch_row())
-    {
-      // create object
-      $obj = new $class_name();
-
-      // keep track of sub ezdb objects
-      $sub_ezdb_obj = array();
-
-      // from the result row, we extract data and try to store them
-      foreach ($fields_meta as $idx => $field)
+      while ($row = $result->fetch_row())
       {
-        if ($field->name === false)
-          ;
-        else if ($ezdb_mode === false)
-          $obj->{$field->name} = $this->cast($field, $row[$idx]);
-        elseif ($field->table == $table_name)
-          $obj->{$field->name} = $this->cast($field, $row[$idx]);
-        else if ($field->table !== false && $field->name !== false && !isset($fields[$field->table]))
+        // create object
+        $obj = new $class_name();
+
+        // keep track of sub ezdb objects
+        $sub_ezdb_obj = array();
+
+        // from the result row, we extract data and try to store them
+        foreach ($fields_meta as $idx => $field)
         {
-          // we don't create sub entry if for null 
-          //if (!isset($obj->{$field->table}) && $row[$idx] === null)
-          //  continue;
-          if (!isset($obj->{$field->table}))
+          if ($field->name === false)
+            ;
+//          else if ($ezdb_mode === false)
+//            $obj->{$field->name} = $this->cast($field, $row[$idx]);
+          elseif ($field->table == $table_name)
+            $obj->{$field->name} = $this->cast($field, $row[$idx]);
+          else if ($field->table !== false && $field->name !== false && !isset($fields[$field->table]))
           {
-            $sub_class_name = $this->getClassName($field->table);
-            $sub_obj = new $sub_class_name;
-            $sub_ezdb_obj []= $field->table;
-            $obj->{$field->table} = $sub_obj;
+            // we don't create sub entry if for null 
+            //if (!isset($obj->{$field->table}) && $row[$idx] === null)
+            //  continue;
+            if (!isset($obj->{$field->table}))
+            {
+              $sub_class_name = $this->getClassName($field->orgtable);
+              $sub_obj = new $sub_class_name;
+              $sub_ezdb_obj []= $field->table;
+              $obj->{$field->table} = $sub_obj;
+            }
+            $obj->{$field->table}->{$field->name} = $this->cast($field, $row[$idx]);
           }
-          $obj->{$field->table}->{$field->name} = $this->cast($field, $row[$idx]);
+          else if ($field->name !== false)
+            $obj->{$field->name} = $this->cast($field, $row[$idx]);
         }
-        else if ($field->name !== false)
-          $obj->{$field->name} = $this->cast($field, $row[$idx]);
-      }
 
-      // init ezdb object
-      if ($ezdb_mode)
-      {
+        // init ezdb object
         $this->preInitEzDBObj($obj, $fields, $table_name, $primary_key, $sub_ezdb_obj);
+
+        // if we have a primary key, use it as index
+        if ($fill_list_with_primary_key && $primary_key && isset($obj->$primary_key))
+          $array[$obj->$primary_key] = $obj;
+        else
+          $array[] = $obj;
       }
-      // if we have a primary key, use it as index
-      if ($primary_key && isset($obj->$primary_key) && $fill_list_with_primary_key)
-        $array[$obj->$primary_key] = $obj;
-      else
-        $array[] = $obj;
+    } else {
+      while ($obj = $result->fetch_object($class_name))
+      {
+        if ($fill_list_with_primary_key && $primary_key && isset($obj->$primary_key))
+          $array[$obj->$primary_key] = $obj;
+        else
+          $array[] = $obj;
+      }      
     }
 
     // do we need to put result in cache ?
