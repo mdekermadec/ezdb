@@ -161,6 +161,32 @@ class EzDBCountProxyHelper extends EzDBProxyHelper
 
 }
 
+// Each
+class EzDBEachProxyHelper extends EzDBProxyHelper
+{
+  function doEach($cond, $callback)
+  {
+    if (is_array($cond))
+      $sql = $this->db->queryBuilder->select($this->class_name, $this->table_name, $this->primary_key, $cond);
+    else
+      $sql = $cond;
+    $param = null;
+    return $this->db->Each($sql, $callback, $param, $this->class_name, $this->table_name, $this->primary_key);
+  }
+
+  function __invoke($cond, $callback)
+  {
+    return $this->doEach($cond, $callback);
+  }
+
+/*  public function __call($method, $args)
+  {
+    $cond = array($method => $args[0]);
+    return $this->doEach($cond);
+  }*/
+
+}
+
 // From Public Id
 class EzDBPublicProxyHelper extends EzDBProxyHelper
 {
@@ -390,6 +416,7 @@ class EzDB
     $this->create = new EzDBProxyHelperMaker($this, 'create');
     $this->query = new EzDBProxyHelperMaker($this, 'query');
     $this->count = new EzDBProxyHelperMaker($this, 'count');
+    $this->foreach = new EzDBProxyHelperMaker($this, 'each');
     $this->public = new EzDBProxyHelperMaker($this, 'public');
 
     // auto cache internals
@@ -585,8 +612,6 @@ class EzDB
   {
     if ($fill_list_with_primary_key === null)
       $fill_list_with_primary_key = $this->fill_list_with_primary_key;
-    // start loging execution time
-    $time_start = microtime(true);
 
     // detect if we are in EzDB mode or anonyme mode
     // in ezdb mode, object have special class
@@ -603,12 +628,48 @@ class EzDB
       $array = apc_fetch($key, $success);
       // founded ?
       if ($success === true)
-      {
-        //if ($ezdb_mode)
-        //  return $this->initEzDBObjArray($array);
         return $array;
-      }
     }
+
+    // store result in an array
+    $data = new stdClass;
+    $data->array = array();
+    $data->fill_list_with_primary_key = $fill_list_with_primary_key;
+    $data->primary_key = $primary_key;
+
+    $this->Each($sql, function($obj, &$data) {
+        $primary_key = $data->primary_key;
+        // if we have a primary key, use it as index
+        if ($data->fill_list_with_primary_key && $primary_key && isset($obj->$primary_key))
+          $data->array[$obj->$primary_key] = $obj;
+        else
+          $data->array[] = $obj;
+    }, $data, $class_name, $table_name, $primary_key);
+    
+    // do we need to put result in cache ?
+    if (!$this->no_cache && $this->enable_query_cache && $table_name && isset($this->cached_table[$table_name]))
+    {
+      apc_store($key, $data->array, $this->cached_table[$table_name]);
+      $this->addCacheTag($table_name, $key);
+    }
+
+    if ($ezdb_mode)
+      return $this->initEzDBObjArray($data->array);
+
+    return $data->array;
+  }
+
+  function Each($sql, $callback, &$param, $class_name = 'stdClass', $table_name = false, $primary_key = false)
+  {
+    // start loging execution time
+    $time_start = microtime(true);
+
+    // detect if we are in EzDB mode or anonyme mode
+    // in ezdb mode, object have special class
+    if ($table_name && $primary_key && (is_subclass_of($class_name, 'EzDBObj') || strcasecmp($class_name, 'EzDBObj') === 0))
+      $ezdb_mode = true;
+    else
+      $ezdb_mode = false;
 
     // connect if needed
     $this->Connect(EzDB::READ);
@@ -627,9 +688,6 @@ class EzDB
 
     // log query if needed
     $this->queryLog($time_start, $time_end, $sql);
-
-    // store result in an array
-    $array = array();
     
     // extract all field from object and give it to object
     if ($ezdb_mode)
@@ -673,34 +731,20 @@ class EzDB
         // init ezdb object
         $this->preInitEzDBObj($obj, $fields, $table_name, $primary_key, $sub_ezdb_obj);
 
-        // if we have a primary key, use it as index
-        if ($fill_list_with_primary_key && $primary_key && isset($obj->$primary_key))
-          $array[$obj->$primary_key] = $obj;
-        else
-          $array[] = $obj;
+        if ($callback($obj, $param) === false)
+          return false;
       }
     } else {
       while ($obj = $result->fetch_object($class_name))
       {
-        if ($fill_list_with_primary_key && $primary_key && isset($obj->$primary_key))
-          $array[$obj->$primary_key] = $obj;
-        else
-          $array[] = $obj;
+        if ($callback($obj, $param) === false)
+          return false;
       }      
     }
 
-    // do we need to put result in cache ?
-    if (!$this->no_cache && $this->enable_query_cache && $table_name && isset($this->cached_table[$table_name]))
-    {
-      apc_store($key, $array, $this->cached_table[$table_name]);
-      $this->addCacheTag($table_name, $key);
-    }
-
-    if ($ezdb_mode)
-      return $this->initEzDBObjArray($array);
-
-    return $array;
+    return true;
   }
+
 
   function cast($field, $value)
   {
