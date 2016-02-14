@@ -844,6 +844,8 @@ binary_        254
       {
         if (isset($ezdb_metas['type']) && $ezdb_metas['type'] == 'json')
           $value = json_encode($value);
+        if (isset($ezdb_metas['type']) && $ezdb_metas['type'] == 'json_array')
+          $value = json_encode($value, true);
         if (isset($ezdb_metas['compress']) && $ezdb_metas['compress'] == 1)
           $value = "\x1f\x8b\x08\x00".gzcompress($value);//gzdeflate($value);
       }
