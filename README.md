@@ -73,6 +73,11 @@ $db->MultiQuery("UPDATE car SET model = CONCAT('Das ', model) WHERE 1; UPDATE ca
 // count query
 $nb_car = $db->count->car->model("My Model");
 
+// foreach (use less memory, usefull for big dataset)
+$db->foreach->car($sql, function ($car) {
+  print "{$car->model}<br />";
+});
+
 ```
 
 Custom class
