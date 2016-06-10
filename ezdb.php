@@ -464,8 +464,14 @@ class EzDB
       $this->mysqli->connect($this->mysql_host, $this->mysql_login, $this->mysql_password, $this->mysql_dbname, $this->mysql_port);
     elseif ($required_level == EzDB::READ)
       $this->mysqli->connect($this->mysql_host_ro, $this->mysql_login_ro, $this->mysql_password_ro, $this->mysql_dbname_ro, $this->mysql_port_ro);
-    if (mysqli_connect_errno())
+    if (mysqli_connect_errno()) {
+      if ($required_level == EzDB::READ) {
+        $this->debug('EzDB: Error: Read Database connection failed fallback to write: ' . mysqli_connect_error());
+        $this->mysqli = false;
+        return $this->connect(EzDB::WRITE);
+      }
       trigger_error('EzDB: Fatal: Database connection failed: ' . mysqli_connect_error(), E_USER_ERROR);
+    }
 
     // configure SQL connection
     if ($this->mysqli->set_charset('utf8') == FALSE)
