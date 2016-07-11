@@ -1463,11 +1463,17 @@ class EzDBObj
     $updated_fields = array();
     foreach ($original_fields_values as $name => &$value)
     {
-      if (!($this->$name === $value) && $name != $primary_key)
+      // null value must be exact match
+      if ($this->$name === null && !($this->$name === $value) && $name != $primary_key)
       {
         $new_original_fields_values[$name] = $this->$name;
         $updated_fields[] = $name;
-//        $this->_ezdb['original_fields_values'][$name] = $this->$name;
+      }
+      // otherwise only we check by value
+      else if (!($this->$name == $value) && $name != $primary_key)
+      {
+        $new_original_fields_values[$name] = $this->$name;
+        $updated_fields[] = $name;
       } else {
         $new_original_fields_values[$name] = $value;
       }
