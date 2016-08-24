@@ -474,7 +474,7 @@ class EzDB
     }
 
     // configure SQL connection
-    if ($this->mysqli->set_charset('utf8') == FALSE)
+    if ($this->mysqli->set_charset('utf8mb4') == FALSE)
       trigger_error("EzDB: Fatal: set mysqli charset failed", E_USER_ERROR);
 
     $time_end = microtime(true);
@@ -484,6 +484,8 @@ class EzDB
     $this->current_connection_level = $required_level;
 
     $this->Query('SET time_zone = "Europe/Paris"', EzDB::READ);
+    $this->Query('SET CHARACTER SET utf8mb4', EzDB::READ);
+    $this->Query('SET NAMES utf8mb4', EzDB::READ);
 
     // init tables infos
     $this->tables_infos = $this->getTablesInfos();    
