@@ -397,7 +397,7 @@ class EzDB
   {
     $this->db = $this;
     $this->cached_table = array();
-    $this->dbkey = 'ezdb2' . $login . '#' . $dbname . '#' . $host;
+    $this->dbkey = 'ezdb2' . $login . '#' . $dbname . '#' . $host . (isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'cli');
 
     // connect is done only if needed
     $this->mysqli = false;
