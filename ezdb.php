@@ -563,6 +563,20 @@ class EzDB
     if ($result === false)
       return $this->handleSQLError($query);
 
+    if ($result === true)
+      return true;
+
+    // there are some results ?
+    if ($result->field_count > 0 && $result->num_rows > 0)
+    {
+      $array = [];
+      while ($obj = $result->fetch_object())
+      {
+        $array []= $obj;
+      }
+      return $array;
+    }
+
     return true;
   }
 
