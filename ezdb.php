@@ -1015,7 +1015,11 @@ binary_        254
   {
     if (isset($field_infos['type']) && strpos($field_infos['type'], 'decimal') === 0) // decimal
       return (float)$val;
-    if ($val === null)
+    else if (isset($field_infos['type']) && strpos($field_infos['type'], 'int') === 0) // int
+      return (int)$val;     
+    else if (isset($field_infos['type']) && strpos($field_infos['type'], 'tinyint') === 0) // boolean
+      return (int)$val;     
+    else if ($val === null)
       return ' NULL ';
     else
       return '\'' . addslashes($val) . '\'';
@@ -1589,3 +1593,4 @@ class EzDBObj
     $this->EZdbInit();
   }
 }
+
