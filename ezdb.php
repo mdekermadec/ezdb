@@ -208,7 +208,7 @@ class EzDBQueryBuilder
   {
     $sql = '';
     $infos = $this->db->getTableInfo($table_name);
-    foreach ($fields as $name)
+    foreach ($infos as $name => $field_infos)
     {
       // we unknow skip fields
       if (!array_key_exists($name, $infos))
@@ -218,7 +218,7 @@ class EzDBQueryBuilder
       }
       if ($sql != '')
         $sql .= ' , ';
-      $escp_val = $this->db->PhpToDB( $this->db->uncast($table_name, $name, $obj->$name) );
+      $escp_val = $this->db->PhpToDB($this->db->uncast($table_name, $name, $obj->$name), $field_infos);
       $sql .= ' `' . $name . '` = ' . $escp_val . ' ';
     }
     $sql = "UPDATE `{$table_name}` SET " . $sql . ' WHERE 1 ';
@@ -250,8 +250,7 @@ class EzDBQueryBuilder
         $sql_val .= ' , ';
         $sql_dup .= ' , ';
       }
-
-      $escp_val = $this->db->PhpToDB( $this->db->uncast($table_name, $name, $val) );
+      $escp_val = $this->db->PhpToDB($this->db->uncast($table_name, $name, $val), $infos[$name] ?? false);
       $sql .= ' `' . $name . '` ';
       $sql_val .= ' ' . $escp_val . ' ';
       $sql_dup .= ' `' . $name . '` = ' . $escp_val . ' ';
@@ -303,7 +302,7 @@ class EzDBQueryBuilder
         $sql .= ' AND `' . $name . '` IS NULL ';
       else
       {
-        $escp_val = $this->db->PhpToDB( $this->db->uncast($table_name, $name, $val) );
+        $escp_val = $this->db->PhpToDB($this->db->uncast($table_name, $name, $val), $infos[$name] ?? false);
         $sql .= ' AND `' . $name . '` = ' . $escp_val . ' ';
       }
     }
@@ -340,7 +339,7 @@ class EzDBQueryBuilder
         $sql .= ' AND `' . $name . '` IS NULL ';
       else
       {
-        $escp_val = $this->db->PhpToDB( $this->db->uncast($table_name, $name, $val) );
+        $escp_val = $this->db->PhpToDB($this->db->uncast($table_name, $name, $val), $infos[$name] ?? false);
         $sql .= ' AND `' . $name . '` = ' . $escp_val . ' ';
       }
     }
@@ -464,10 +463,12 @@ class EzDB
       $this->mysqli->connect($this->mysql_host, $this->mysql_login, $this->mysql_password, $this->mysql_dbname, $this->mysql_port);
     elseif ($required_level == EzDB::READ)
       $this->mysqli->connect($this->mysql_host_ro, $this->mysql_login_ro, $this->mysql_password_ro, $this->mysql_dbname_ro, $this->mysql_port_ro);
-    if (mysqli_connect_errno()) {
-      if ($required_level == EzDB::READ) {
-        $this->debug('EzDB: Error: Read Database connection failed fallback to write: ' . mysqli_connect_error());
-        $this->mysqli = false;
+    if (mysqli_connect_errno())
+    {
+      if ($required_level == EzDB::READ)
+      {
+        $this->debug('EzDB: Error: Read Database connection failed fallback to write: ' . mysqli_connect_error());    
+        $this->mysqli = false;    
         return $this->connect(EzDB::WRITE);
       }
       trigger_error('EzDB: Fatal: Database connection failed: ' . mysqli_connect_error(), E_USER_ERROR);
@@ -647,7 +648,7 @@ class EzDB
     if ($this->enable_query_cache && $table_name && isset($this->cached_table[$table_name]) && !$this->no_cache)
     {
       $GLOBALS[EzDB::CURRENT_EZDB] = $this;
-      $array = apc_fetch($key, $success);
+      $array = apcu_fetch($key, $success);
       // founded ?
       if ($success === true)
         return $array;
@@ -671,7 +672,7 @@ class EzDB
     // do we need to put result in cache ?
     if (!$this->no_cache && $this->enable_query_cache && $table_name && isset($this->cached_table[$table_name]))
     {
-      apc_store($key, $data->array, $this->cached_table[$table_name]);
+      apcu_store($key, $data->array, $this->cached_table[$table_name]);
       $this->addCacheTag($table_name, $key);
     }
 
@@ -832,6 +833,11 @@ binary_        254
     // int
     if ($field->type == 2 || $field->type == 3)
       return (int)$value;
+    /*if ($field->type == 246)
+    {
+      return str_replace(',', '.', (string)$value);
+    }*/
+
     // float
     if ($field->type == 4 || $field->type == 5 || $field->type == 246)
       return (float)$value;
@@ -1005,8 +1011,10 @@ binary_        254
     return $this->Query($sql);
   }
 
-  function PhpToDB($val)
+  function PhpToDB($val, $field_infos = false)
   {
+    if (isset($field_infos['type']) && strpos($field_infos['type'], 'decimal') === 0) // decimal
+      return (float)$val;
     if ($val === null)
       return ' NULL ';
     else
@@ -1116,7 +1124,7 @@ binary_        254
       $key = $this->dbkey.'#table_class_assoc';
       if (!$this->no_cache)
       {
-        $table_class_assoc = apc_fetch($key, $success);
+        $table_class_assoc = apcu_fetch($key, $success);
         if ($success == false)
           $table_class_assoc = array();
       }
@@ -1139,7 +1147,7 @@ binary_        254
     $table_class_assoc[$table_name]['class_name'] = $class_name;
     $table_class_assoc[$table_name]['class_path'] = $class_path;
     if (!$this->no_cache)
-      apc_store($key, $table_class_assoc, $this->default_cache_ttl);
+      apcu_store($key, $table_class_assoc, $this->default_cache_ttl);
 
     return $class_name;
   }
@@ -1178,7 +1186,7 @@ binary_        254
     // try to fetch from apc
     if ($tables_infos == false && !$this->no_cache && !$no_cache)
     {
-      $tables_infos = apc_fetch($key, $success);
+      $tables_infos = apcu_fetch($key, $success);
       if ($success)
         return $tables_infos;
     }
@@ -1207,7 +1215,7 @@ binary_        254
         {
           foreach ($field_info as $k => $v)
           {
-            if ($k == 'Comment' || $k == 'Key' || $k == 'Field')
+            if ($k == 'Comment' || $k == 'Key' || $k == 'Field' || $k == 'Type')
               $fields_infos[$field][strtolower($k)] = $v;
           }
         }
@@ -1235,7 +1243,7 @@ binary_        254
     }
 
     if (!$this->no_cache)
-      apc_store($key, $tables_infos, $this->default_cache_ttl);
+      apcu_store($key, $tables_infos, $this->default_cache_ttl);
 
     return $tables_infos;
   }
@@ -1280,22 +1288,22 @@ binary_        254
   {
     $tagkey = $this->dbkey.'#cache_tag#'.$tag;
 
-    $tagkeys = apc_fetch($tagkey, $success);
+    $tagkeys = apcu_fetch($tagkey, $success);
     if ($success === false)
       $tagkeys = array();
 
     $tagkeys[$key] = $key;
 
-    apc_store($tagkey, $tagkeys, $this->default_cache_ttl * 2 + 600);
+    apcu_store($tagkey, $tagkeys, $this->default_cache_ttl * 2 + 600);
   }
 
   function deleteCacheTag($tag)
   {
     $tagkey = $this->dbkey.'#cache_tag#'.$tag;
 
-    $tagkeys = apc_fetch($tagkey, $success);
+    $tagkeys = apcu_fetch($tagkey, $success);
     if ($success !== false)
-        apc_delete($tagkeys);
+        apcu_delete($tagkeys);
   }
 
   // deprecated
@@ -1480,7 +1488,7 @@ class EzDBObj
     foreach ($original_fields_values as $name => &$value)
     {
       // null value must be exact match
-      if ($this->$name === null && !($this->$name === $value) && $name != $primary_key)
+      if ($this->$name === null && !($this->$name !== $value) && $name != $primary_key)
       {
         $new_original_fields_values[$name] = $this->$name;
         $updated_fields[] = $name;
@@ -1581,4 +1589,3 @@ class EzDBObj
     $this->EZdbInit();
   }
 }
-
